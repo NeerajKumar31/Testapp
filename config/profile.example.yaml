@@ -1,0 +1,53 @@
+# Copy to config/profile.yaml and fill in your details.
+
+personal:
+  first_name: Jane
+  last_name: Doe
+  email: jane.doe@example.com
+  phone: "+1 555-0100"
+  location: "San Francisco, CA"
+  linkedin_url: "https://linkedin.com/in/janedoe"
+  portfolio_url: "https://janedoe.dev"
+  github_url: "https://github.com/janedoe"
+
+resume:
+  path: "resumes/resume.pdf"
+  # Plain-text summary used when a cover letter field is optional
+  summary: |
+    Senior software engineer with 8+ years building web applications.
+    Experienced in Python, TypeScript, and cloud infrastructure.
+
+search:
+  keywords: "software engineer"
+  location: "Remote"
+  # indeed | greenhouse
+  platforms:
+    - indeed
+    - greenhouse
+  # Skip jobs whose titles contain any of these (case-insensitive)
+  exclude_title_keywords:
+    - intern
+    - senior director
+  max_jobs_per_run: 10
+
+application:
+  # dry_run: log actions without submitting
+  dry_run: true
+  # Seconds to wait between applications (be respectful to sites)
+  delay_seconds: 30
+  # Optional default cover letter (supports {company} and {title} placeholders)
+  cover_letter: |
+    Dear Hiring Team,
+
+    I am excited to apply for the {title} role at {company}. My background
+    in building reliable software aligns well with your needs.
+
+    Thank you for your consideration.
+    {first_name} {last_name}
+
+# Greenhouse company boards to monitor (slug from jobs.greenhouse.io/{slug})
+greenhouse:
+  companies:
+    - stripe
+    - figma
+    - notion
