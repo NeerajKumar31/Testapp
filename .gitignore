@@ -22,9 +22,26 @@ $RECYCLE.BIN/
 # =========================
 
 # OSX
-# =========================
-
 .DS_Store
+
+# Android
+*.iml
+.gradle/
+LudoGameAndroid/.gradle/
+/local.properties
+LudoGameAndroid/local.properties
+/.idea/
+LudoGameAndroid/.idea/
+.DS_Store
+/build/
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.ap_
+*.aab
+
+# Xcode
 .AppleDouble
 .LSOverride
 
