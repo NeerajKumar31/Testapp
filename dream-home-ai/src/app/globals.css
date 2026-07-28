@@ -794,6 +794,39 @@ button {
   gap: 0.45rem;
 }
 
+.category-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem;
+  margin-bottom: 0.65rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: rgba(28, 25, 21, 0.05);
+}
+
+.category-tabs button {
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  padding: 0.45rem 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--ink-soft);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.category-tabs button.active {
+  background: var(--moss);
+  color: #f7f3ea;
+}
+
+.category-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
 .room-add {
   border: 1px solid var(--line);
   background: #fffdf8;
@@ -803,6 +836,11 @@ button {
   font-weight: 550;
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.room-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .room-add:hover,

@@ -7,6 +7,9 @@ Design a dream home in 3D with **manual tools**, **text prompts**, and **interio
 - **Prompt mode** — Describe bedrooms, baths, style, and extras; Hearth generates a 3D floor plan.
 - **Manual mode** — Add and size rooms, reposition them, tint walls/floors, toggle roof and wall opacity.
 - **Interior mode** — Unlocks after you complete the model. Auto-furnish with style palettes (Scandinavian, coastal, industrial, etc.) or place furniture by hand.
+  - **Appliances** — Fridge, dishwasher, stove, oven, microwave, range hood, coffee maker, toaster, washer/dryer
+  - **Furniture** — Cabinets, island, pantry, stools, tables, and room furniture
+  - **Utensils** — Stock kitchen cabinets with plates, bowls, cups, pots, pans, cutlery, spice racks, and more
 
 ## Stack
 

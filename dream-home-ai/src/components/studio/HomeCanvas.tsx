@@ -4,30 +4,90 @@ import { Html, OrbitControls, Grid, ContactShadows } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
-import { FURNITURE_CATALOG } from "@/lib/catalog";
+import { FURNITURE_CATALOG, isCabinetType } from "@/lib/catalog";
 import { useHomeStore } from "@/lib/store";
-import type { FurnitureItem, Room } from "@/lib/types";
+import type { FurnitureItem, FurnitureType, Room } from "@/lib/types";
+
+function emissiveProps(selected: boolean) {
+  return {
+    emissive: selected ? "#1a3a2a" : "#000000",
+    emissiveIntensity: selected ? 0.18 : 0,
+  } as const;
+}
+
+function BoxPiece({
+  position,
+  args,
+  color,
+  selected,
+  metalness = 0.05,
+  roughness = 0.7,
+  onClick,
+}: {
+  position: [number, number, number];
+  args: [number, number, number];
+  color: string;
+  selected: boolean;
+  metalness?: number;
+  roughness?: number;
+  onClick?: (e: ThreeEvent<MouseEvent>) => void;
+}) {
+  return (
+    <mesh position={position} castShadow receiveShadow onClick={onClick}>
+      <boxGeometry args={args} />
+      <meshStandardMaterial
+        color={color}
+        metalness={metalness}
+        roughness={roughness}
+        {...emissiveProps(selected)}
+      />
+    </mesh>
+  );
+}
 
 function FurnitureMesh({
   item,
   selected,
   onSelect,
+  parent,
 }: {
   item: FurnitureItem;
   selected: boolean;
   onSelect: () => void;
+  parent?: FurnitureItem;
 }) {
   const cat = FURNITURE_CATALOG[item.type];
   const w = cat.w * item.scale;
   const d = cat.d * item.scale;
   const h = cat.h * item.scale;
+  const type = item.type;
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onSelect();
   };
 
-  if (item.type === "rug") {
+  let baseY = 0;
+  if (item.parentId && parent) {
+    const parentCat = FURNITURE_CATALOG[parent.type];
+    if (parent.type === "upper_cabinet") {
+      baseY = 1.45;
+    } else {
+      baseY = parentCat.h + 0.02;
+    }
+  } else if (type === "upper_cabinet") {
+    baseY = 1.45;
+  } else if (type === "range_hood") {
+    baseY = 1.55;
+  } else if (
+    type === "microwave" ||
+    type === "coffee_maker" ||
+    type === "toaster"
+  ) {
+    baseY = 0.92;
+  }
+
+  if (type === "rug") {
     return (
       <mesh
         position={[item.x, 0.015, item.z]}
@@ -39,17 +99,16 @@ function FurnitureMesh({
         <meshStandardMaterial
           color={item.color}
           roughness={0.95}
-          emissive={selected ? "#1a3a2a" : "#000000"}
-          emissiveIntensity={selected ? 0.15 : 0}
+          {...emissiveProps(selected)}
         />
       </mesh>
     );
   }
 
-  if (item.type === "plant") {
+  if (type === "plant") {
     return (
       <group
-        position={[item.x, 0, item.z]}
+        position={[item.x, baseY, item.z]}
         rotation={[0, item.rotation, 0]}
         onClick={handleClick}
       >
@@ -62,18 +121,17 @@ function FurnitureMesh({
           <meshStandardMaterial
             color={item.color}
             roughness={0.7}
-            emissive={selected ? "#1a3a2a" : "#000000"}
-            emissiveIntensity={selected ? 0.2 : 0}
+            {...emissiveProps(selected)}
           />
         </mesh>
       </group>
     );
   }
 
-  if (item.type === "lamp") {
+  if (type === "lamp") {
     return (
       <group
-        position={[item.x, 0, item.z]}
+        position={[item.x, baseY, item.z]}
         rotation={[0, item.rotation, 0]}
         onClick={handleClick}
       >
@@ -94,55 +152,272 @@ function FurnitureMesh({
     );
   }
 
-  if (item.type === "sofa" || item.type === "bed") {
+  if (type === "sofa" || type === "bed") {
     return (
       <group
-        position={[item.x, 0, item.z]}
+        position={[item.x, baseY, item.z]}
         rotation={[0, item.rotation, 0]}
         onClick={handleClick}
       >
-        <mesh position={[0, h * 0.35, 0]} castShadow>
-          <boxGeometry args={[w, h * 0.55, d]} />
-          <meshStandardMaterial
+        <BoxPiece
+          position={[0, h * 0.35, 0]}
+          args={[w, h * 0.55, d]}
+          color={item.color}
+          selected={selected}
+          roughness={0.85}
+        />
+        {type === "sofa" && (
+          <BoxPiece
+            position={[0, h * 0.65, -d * 0.35]}
+            args={[w, h * 0.55, d * 0.25]}
             color={item.color}
+            selected={false}
             roughness={0.85}
-            emissive={selected ? "#1a3a2a" : "#000000"}
-            emissiveIntensity={selected ? 0.18 : 0}
           />
-        </mesh>
-        {item.type === "sofa" && (
-          <mesh position={[0, h * 0.65, -d * 0.35]} castShadow>
-            <boxGeometry args={[w, h * 0.55, d * 0.25]} />
-            <meshStandardMaterial color={item.color} roughness={0.85} />
-          </mesh>
         )}
-        {item.type === "bed" && (
-          <mesh position={[0, h * 0.7, -d * 0.35]} castShadow>
-            <boxGeometry args={[w * 0.95, 0.25, d * 0.25]} />
-            <meshStandardMaterial color="#F8F4EF" roughness={0.9} />
-          </mesh>
+        {type === "bed" && (
+          <BoxPiece
+            position={[0, h * 0.7, -d * 0.35]}
+            args={[w * 0.95, 0.25, d * 0.25]}
+            color="#F8F4EF"
+            selected={false}
+            roughness={0.9}
+          />
         )}
       </group>
     );
   }
 
+  if (type === "fridge") {
+    return (
+      <group
+        position={[item.x, baseY, item.z]}
+        rotation={[0, item.rotation, 0]}
+        onClick={handleClick}
+      >
+        <BoxPiece
+          position={[0, h / 2, 0]}
+          args={[w, h, d]}
+          color={item.color}
+          selected={selected}
+          metalness={0.55}
+          roughness={0.35}
+        />
+        <BoxPiece
+          position={[w * 0.35, h * 0.55, d / 2 + 0.01]}
+          args={[0.03, 0.35, 0.02]}
+          color="#888"
+          selected={false}
+          metalness={0.7}
+          roughness={0.3}
+        />
+      </group>
+    );
+  }
+
+  if (type === "stove" || type === "oven") {
+    return (
+      <group
+        position={[item.x, baseY, item.z]}
+        rotation={[0, item.rotation, 0]}
+        onClick={handleClick}
+      >
+        <BoxPiece
+          position={[0, h / 2, 0]}
+          args={[w, h, d]}
+          color={item.color}
+          selected={selected}
+          metalness={0.5}
+          roughness={0.4}
+        />
+        {type === "stove" && (
+          <>
+            <mesh position={[-0.15, h + 0.01, -0.1]}>
+              <cylinderGeometry args={[0.1, 0.1, 0.02, 16]} />
+              <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
+            </mesh>
+            <mesh position={[0.15, h + 0.01, -0.1]}>
+              <cylinderGeometry args={[0.1, 0.1, 0.02, 16]} />
+              <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
+            </mesh>
+            <mesh position={[-0.15, h + 0.01, 0.12]}>
+              <cylinderGeometry args={[0.08, 0.08, 0.02, 16]} />
+              <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
+            </mesh>
+            <mesh position={[0.15, h + 0.01, 0.12]}>
+              <cylinderGeometry args={[0.08, 0.08, 0.02, 16]} />
+              <meshStandardMaterial color="#222" metalness={0.6} roughness={0.4} />
+            </mesh>
+          </>
+        )}
+      </group>
+    );
+  }
+
+  if (type === "sink") {
+    return (
+      <group
+        position={[item.x, baseY, item.z]}
+        rotation={[0, item.rotation, 0]}
+        onClick={handleClick}
+      >
+        <BoxPiece
+          position={[0, h / 2, 0]}
+          args={[w, h, d]}
+          color={item.color}
+          selected={selected}
+          metalness={0.45}
+          roughness={0.35}
+        />
+        <mesh position={[0, h + 0.02, 0]}>
+          <boxGeometry args={[w * 0.55, 0.06, d * 0.45]} />
+          <meshStandardMaterial color="#9AA3A8" metalness={0.7} roughness={0.25} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isCabinetType(type)) {
+    return (
+      <group
+        position={[item.x, baseY, item.z]}
+        rotation={[0, item.rotation, 0]}
+        onClick={handleClick}
+      >
+        <BoxPiece
+          position={[0, h / 2, 0]}
+          args={[w, h, d]}
+          color={item.color}
+          selected={selected}
+          roughness={0.75}
+        />
+        {type !== "upper_cabinet" && (
+          <BoxPiece
+            position={[0, h + 0.015, 0]}
+            args={[w + 0.04, 0.03, d + 0.04]}
+            color="#D9D0C4"
+            selected={false}
+            roughness={0.55}
+          />
+        )}
+        <BoxPiece
+          position={[0, h * 0.45, d / 2 + 0.005]}
+          args={[w * 0.08, 0.02, 0.02]}
+          color="#666"
+          selected={false}
+          metalness={0.6}
+        />
+      </group>
+    );
+  }
+
+  const utensilTypes: FurnitureType[] = [
+    "plates",
+    "bowls",
+    "cups",
+    "pots",
+    "pans",
+    "cutlery",
+    "utensil_jar",
+    "spice_rack",
+    "cutting_board",
+    "storage_bin",
+  ];
+  if (utensilTypes.includes(type)) {
+    return (
+      <group
+        position={[item.x, baseY, item.z]}
+        rotation={[0, item.rotation, 0]}
+        onClick={handleClick}
+      >
+        {type === "plates" || type === "bowls" ? (
+          <>
+            <mesh position={[0, 0.03, 0]} castShadow>
+              <cylinderGeometry args={[w * 0.45, w * 0.45, 0.025, 20]} />
+              <meshStandardMaterial color={item.color} {...emissiveProps(selected)} />
+            </mesh>
+            <mesh position={[0, 0.06, 0]} castShadow>
+              <cylinderGeometry args={[w * 0.42, w * 0.42, 0.025, 20]} />
+              <meshStandardMaterial color={item.color} />
+            </mesh>
+            <mesh position={[0, 0.09, 0]} castShadow>
+              <cylinderGeometry args={[w * 0.38, w * 0.38, 0.025, 20]} />
+              <meshStandardMaterial color={item.color} />
+            </mesh>
+          </>
+        ) : type === "cups" ? (
+          <>
+            {[-0.06, 0.06].map((ox, i) => (
+              <mesh key={i} position={[ox, 0.08, 0]} castShadow>
+                <cylinderGeometry args={[0.035, 0.03, 0.12, 12]} />
+                <meshStandardMaterial color={item.color} {...emissiveProps(selected && i === 0)} />
+              </mesh>
+            ))}
+          </>
+        ) : type === "pots" ? (
+          <mesh position={[0, h / 2, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.4, w * 0.38, h, 16]} />
+            <meshStandardMaterial
+              color={item.color}
+              metalness={0.55}
+              roughness={0.35}
+              {...emissiveProps(selected)}
+            />
+          </mesh>
+        ) : type === "pans" ? (
+          <mesh position={[0, 0.03, 0]} rotation={[-0.1, 0, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.4, w * 0.4, 0.04, 20]} />
+            <meshStandardMaterial
+              color={item.color}
+              metalness={0.6}
+              roughness={0.3}
+              {...emissiveProps(selected)}
+            />
+          </mesh>
+        ) : type === "utensil_jar" ? (
+          <mesh position={[0, h / 2, 0]} castShadow>
+            <cylinderGeometry args={[w * 0.4, w * 0.38, h, 12]} />
+            <meshStandardMaterial color={item.color} {...emissiveProps(selected)} />
+          </mesh>
+        ) : (
+          <BoxPiece
+            position={[0, h / 2, 0]}
+            args={[w, h, d]}
+            color={item.color}
+            selected={selected}
+            metalness={type === "cutlery" ? 0.45 : 0.05}
+            roughness={type === "cutlery" ? 0.35 : 0.7}
+          />
+        )}
+      </group>
+    );
+  }
+
+  const metalTypes: FurnitureType[] = [
+    "dishwasher",
+    "microwave",
+    "range_hood",
+    "toaster",
+    "washer",
+    "dryer",
+  ];
+  const isMetal = metalTypes.includes(type) || type === "coffee_maker";
+
   return (
-    <mesh
-      position={[item.x, h / 2, item.z]}
+    <group
+      position={[item.x, baseY, item.z]}
       rotation={[0, item.rotation, 0]}
       onClick={handleClick}
-      castShadow
-      receiveShadow
     >
-      <boxGeometry args={[w, h, d]} />
-      <meshStandardMaterial
+      <BoxPiece
+        position={[0, h / 2, 0]}
+        args={[w, h, d]}
         color={item.color}
-        roughness={0.7}
-        metalness={item.type === "stove" || item.type === "sink" ? 0.5 : 0.05}
-        emissive={selected ? "#1a3a2a" : "#000000"}
-        emissiveIntensity={selected ? 0.18 : 0}
+        selected={selected}
+        metalness={isMetal ? 0.5 : 0.05}
+        roughness={isMetal ? 0.35 : 0.7}
       />
-    </mesh>
+    </group>
   );
 }
 
@@ -177,9 +452,14 @@ function RoomMesh({
     [room.wallColor, wallsOpacity]
   );
 
+  const byId = useMemo(() => {
+    const map = new Map<string, FurnitureItem>();
+    for (const f of room.furniture) map.set(f.id, f);
+    return map;
+  }, [room.furniture]);
+
   return (
     <group position={[room.x, 0, room.z]}>
-      {/* Floor */}
       <mesh
         position={[0, floorY, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -197,7 +477,6 @@ function RoomMesh({
         />
       </mesh>
 
-      {/* Selection outline */}
       {selected && (
         <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry
@@ -211,7 +490,6 @@ function RoomMesh({
         </mesh>
       )}
 
-      {/* Walls */}
       <mesh position={[0, h / 2, -room.depth / 2]} castShadow>
         <boxGeometry args={[room.width + wallT, h, wallT]} />
         <meshStandardMaterial {...wallMat} />
@@ -229,10 +507,10 @@ function RoomMesh({
         <meshStandardMaterial {...wallMat} />
       </mesh>
 
-      {/* Windows (simple recessed panels) */}
       {room.windows > 0 &&
         Array.from({ length: Math.min(room.windows, 2) }).map((_, i) => {
-          const z = room.windows === 1 ? 0 : i === 0 ? -room.depth * 0.22 : room.depth * 0.22;
+          const z =
+            room.windows === 1 ? 0 : i === 0 ? -room.depth * 0.22 : room.depth * 0.22;
           return (
             <mesh key={i} position={[room.width / 2 + 0.01, h * 0.55, z]}>
               <boxGeometry args={[0.04, h * 0.35, 1.1]} />
@@ -247,7 +525,6 @@ function RoomMesh({
           );
         })}
 
-      {/* Roof */}
       {showRoof && (
         <mesh position={[0, h + 0.15, 0]} castShadow>
           <boxGeometry args={[room.width + 0.3, 0.15, room.depth + 0.3]} />
@@ -255,7 +532,6 @@ function RoomMesh({
         </mesh>
       )}
 
-      {/* Label */}
       <Html position={[0, 0.05, 0]} center distanceFactor={18} style={{ pointerEvents: "none" }}>
         <div
           style={{
@@ -278,6 +554,7 @@ function RoomMesh({
         <FurnitureMesh
           key={item.id}
           item={item}
+          parent={item.parentId ? byId.get(item.parentId) : undefined}
           selected={selectedFurnitureId === item.id}
           onSelect={() => {
             onSelect();

@@ -299,7 +299,7 @@ export const PROMPT_SUGGESTIONS = [
 
 export const INTERIOR_SUGGESTIONS = [
   "Furnish in warm Scandinavian style",
-  "Decorate with mid-century furniture",
+  "Stock the kitchen with appliances and cabinet utensils",
   "Japanese zen interiors with dark wood",
   "Coastal interiors — soft blues and sandy tones",
   "Industrial loft furniture and concrete floors",

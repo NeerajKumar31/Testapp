@@ -1,11 +1,21 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
+  CATEGORY_LABELS,
   FURNITURE_CATALOG,
   STYLE_PALETTES,
+  isCabinetType,
+  itemsByCategory,
 } from "@/lib/catalog";
 import { useHomeStore } from "@/lib/store";
-import type { ArchitecturalStyle, FurnitureType } from "@/lib/types";
+import type {
+  ArchitecturalStyle,
+  FurnitureType,
+  ItemCategory,
+} from "@/lib/types";
+
+const CATEGORIES: ItemCategory[] = ["appliance", "furniture", "utensil"];
 
 export function InteriorPanel() {
   const home = useHomeStore((s) => s.home);
@@ -20,10 +30,25 @@ export function InteriorPanel() {
   const setStyle = useHomeStore((s) => s.setStyle);
   const markStructureComplete = useHomeStore((s) => s.markStructureComplete);
   const setWallsOpacity = useHomeStore((s) => s.setWallsOpacity);
+  const [category, setCategory] = useState<ItemCategory>("furniture");
 
   const selected = home.rooms.find((r) => r.id === selectedRoomId) ?? null;
   const selectedItem =
     selected?.furniture.find((f) => f.id === selectedFurnitureId) ?? null;
+
+  const selectedCabinet =
+    selectedItem && isCabinetType(selectedItem.type)
+      ? selectedItem
+      : selected?.furniture.find(
+          (f) =>
+            selectedItem?.parentId === f.id ||
+            (f.id === selectedFurnitureId && isCabinetType(f.type))
+        ) ?? null;
+
+  const cabinetContents = useMemo(() => {
+    if (!selected || !selectedCabinet) return [];
+    return selected.furniture.filter((f) => f.parentId === selectedCabinet.id);
+  }, [selected, selectedCabinet]);
 
   if (!home.structureComplete) {
     return (
@@ -55,9 +80,12 @@ export function InteriorPanel() {
     );
   }
 
-  const availableFurniture = (
-    Object.entries(FURNITURE_CATALOG) as [FurnitureType, (typeof FURNITURE_CATALOG)[FurnitureType]][]
-  ).filter(([, meta]) => !selected || meta.rooms.includes(selected.type));
+  const catalogItems = selected
+    ? itemsByCategory(category, selected.type)
+    : itemsByCategory(category);
+
+  const freeItems =
+    selected?.furniture.filter((f) => !f.parentId) ?? [];
 
   return (
     <div className="side-panel">
@@ -115,21 +143,111 @@ export function InteriorPanel() {
         {selected && (
           <section className="panel-section">
             <h3>Add to {selected.name}</h3>
-            <div className="room-grid">
-              {availableFurniture.map(([type, meta]) => (
+            <div className="category-tabs" role="tablist" aria-label="Item category">
+              {CATEGORIES.map((c) => (
                 <button
-                  key={type}
+                  key={c}
                   type="button"
-                  className="room-add"
-                  onClick={() => addFurniture(selected.id, type)}
+                  role="tab"
+                  aria-selected={category === c}
+                  className={category === c ? "active" : ""}
+                  onClick={() => setCategory(c)}
                 >
-                  {meta.label}
+                  {CATEGORY_LABELS[c]}
                 </button>
               ))}
             </div>
-            {selected.furniture.length > 0 && (
+
+            {category === "utensil" && (
+              <p className="category-hint">
+                {selectedCabinet
+                  ? `Adding into ${FURNITURE_CATALOG[selectedCabinet.type].label}. Select another cabinet to change target.`
+                  : "Select a kitchen cabinet, upper cabinet, pantry, or island first — utensils stock that cabinet."}
+              </p>
+            )}
+
+            <div className="room-grid">
+              {catalogItems.length === 0 ? (
+                <p className="muted">Nothing in this category for this room.</p>
+              ) : (
+                catalogItems.map(([type, meta]) => {
+                  const needsCabinet = category === "utensil" && meta.forCabinets;
+                  const disabled = needsCabinet && !selectedCabinet;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      className="room-add"
+                      disabled={disabled}
+                      title={
+                        disabled
+                          ? "Select a cabinet first"
+                          : `Add ${meta.label}`
+                      }
+                      onClick={() => {
+                        if (needsCabinet && selectedCabinet) {
+                          addFurniture(selected.id, type, selectedCabinet.id);
+                        } else if (!needsCabinet) {
+                          addFurniture(selected.id, type);
+                          if (isCabinetType(type)) {
+                            // Keep furniture tab useful; cabinets are furniture
+                          }
+                        }
+                      }}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {selected.type === "kitchen" && category === "furniture" && (
+              <p className="category-hint">
+                Tip: add Base / Upper cabinets or an Island, then switch to Utensils to stock them.
+              </p>
+            )}
+
+            {freeItems.length > 0 && (
               <ul className="room-list tight">
-                {selected.furniture.map((f) => (
+                {freeItems.map((f) => {
+                  const childCount = selected.furniture.filter(
+                    (c) => c.parentId === f.id
+                  ).length;
+                  return (
+                    <li key={f.id}>
+                      <button
+                        type="button"
+                        className={selectedFurnitureId === f.id ? "active" : ""}
+                        onClick={() => selectFurniture(f.id)}
+                      >
+                        <strong>{FURNITURE_CATALOG[f.type].label}</strong>
+                        <span>
+                          {isCabinetType(f.type) && childCount > 0
+                            ? `${childCount} utensils`
+                            : "rotate / move"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {selected && selectedCabinet && (
+          <section className="panel-section">
+            <h3>
+              Cabinet contents — {FURNITURE_CATALOG[selectedCabinet.type].label}
+            </h3>
+            {cabinetContents.length === 0 ? (
+              <p className="muted">
+                Empty. Open Utensils and add plates, pots, cutlery, and more.
+              </p>
+            ) : (
+              <ul className="room-list tight">
+                {cabinetContents.map((f) => (
                   <li key={f.id}>
                     <button
                       type="button"
@@ -137,18 +255,35 @@ export function InteriorPanel() {
                       onClick={() => selectFurniture(f.id)}
                     >
                       <strong>{FURNITURE_CATALOG[f.type].label}</strong>
-                      <span>rotate / move</span>
+                      <span>in cabinet</span>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
+            <div className="room-grid" style={{ marginTop: "0.65rem" }}>
+              {itemsByCategory("utensil", selected.type).map(([type, meta]) => (
+                <button
+                  key={`cab-${type}`}
+                  type="button"
+                  className="room-add"
+                  onClick={() =>
+                    addFurniture(selected.id, type as FurnitureType, selectedCabinet.id)
+                  }
+                >
+                  + {meta.label}
+                </button>
+              ))}
+            </div>
           </section>
         )}
 
         {selected && selectedItem && (
           <section className="panel-section">
             <h3>Edit {FURNITURE_CATALOG[selectedItem.type].label}</h3>
+            {selectedItem.parentId && (
+              <p className="category-hint">Stored in a kitchen cabinet.</p>
+            )}
             <div className="field-row">
               <label className="field">
                 <span>X</span>
@@ -196,7 +331,11 @@ export function InteriorPanel() {
               <span>Color</span>
               <input
                 type="color"
-                value={selectedItem.color.startsWith("#") ? selectedItem.color : "#8B6914"}
+                value={
+                  selectedItem.color.startsWith("#")
+                    ? selectedItem.color
+                    : "#8B6914"
+                }
                 onChange={(e) =>
                   updateFurniture(selected.id, selectedItem.id, {
                     color: e.target.value,

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { designInterior, interpretAgentPrompt } from "./agent";
-import { createEmptyHome, createRoom } from "./catalog";
+import { createEmptyHome, createFurnitureItem, createRoom } from "./catalog";
 import type {
   ArchitecturalStyle,
   ChatMessage,
@@ -13,7 +13,7 @@ import type {
   RoomType,
   StudioMode,
 } from "./types";
-import { FURNITURE_CATALOG, STYLE_PALETTES } from "./catalog";
+import { STYLE_PALETTES } from "./catalog";
 
 interface HomeStore {
   home: HomeModel;
@@ -39,7 +39,7 @@ interface HomeStore {
   clearHome: () => void;
   markStructureComplete: () => void;
 
-  addFurniture: (roomId: string, type: FurnitureType) => void;
+  addFurniture: (roomId: string, type: FurnitureType, parentId?: string) => void;
   updateFurniture: (
     roomId: string,
     furnitureId: string,
@@ -159,22 +159,14 @@ export const useHomeStore = create<HomeStore>((set, get) => ({
     });
   },
 
-  addFurniture: (roomId, type) => {
+  addFurniture: (roomId, type, parentId) => {
     const { home } = get();
     const room = home.rooms.find((r) => r.id === roomId);
     if (!room) return;
-    const catalog = FURNITURE_CATALOG[type];
-    const item: FurnitureItem = {
-      id: `furn_${Math.random().toString(36).slice(2, 10)}`,
-      type,
-      x: 0,
-      z: 0,
-      rotation: 0,
-      color: STYLE_PALETTES[home.style].wood,
-      scale: 1,
-    };
-    // Keep within room bounds roughly
-    item.x = Math.min(room.width / 2 - catalog.w / 2, 0);
+    const parent = parentId
+      ? room.furniture.find((f) => f.id === parentId)
+      : undefined;
+    const item = createFurnitureItem(type, room, home.style, parent);
     set({
       home: {
         ...home,
@@ -196,9 +188,21 @@ export const useHomeStore = create<HomeStore>((set, get) => ({
             ? r
             : {
                 ...r,
-                furniture: r.furniture.map((f) =>
-                  f.id === furnitureId ? { ...f, ...patch } : f
-                ),
+                furniture: r.furniture.map((f) => {
+                  if (f.id === furnitureId) return { ...f, ...patch };
+                  // Keep utensils glued to a moved cabinet
+                  if (
+                    f.parentId === furnitureId &&
+                    (patch.x !== undefined || patch.z !== undefined)
+                  ) {
+                    const parent = r.furniture.find((p) => p.id === furnitureId);
+                    if (!parent) return f;
+                    const dx = (patch.x ?? parent.x) - parent.x;
+                    const dz = (patch.z ?? parent.z) - parent.z;
+                    return { ...f, x: f.x + dx, z: f.z + dz };
+                  }
+                  return f;
+                }),
               }
         ),
       },
@@ -213,7 +217,10 @@ export const useHomeStore = create<HomeStore>((set, get) => ({
             ? r
             : {
                 ...r,
-                furniture: r.furniture.filter((f) => f.id !== furnitureId),
+                // Also remove utensils stored in a deleted cabinet
+                furniture: r.furniture.filter(
+                  (f) => f.id !== furnitureId && f.parentId !== furnitureId
+                ),
               }
         ),
       },
